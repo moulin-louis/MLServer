@@ -1,33 +1,35 @@
+import mlflow
+
 import asyncio
 from io import StringIO
-
-import mlflow
 from fastapi import Depends, Header, Request, Response
+
+from mlflow.version import VERSION
 from mlflow.exceptions import MlflowException
 from mlflow.pyfunc.scoring_server import (
+    CONTENT_TYPES,
     CONTENT_TYPE_CSV,
     CONTENT_TYPE_JSON,
-    CONTENT_TYPES,
+    parse_csv_input,
     _split_data_and_params,
     infer_and_parse_data,
-    parse_csv_input,
     predictions_to_json,
 )
-from mlflow.version import VERSION
-from mlserver.errors import InferenceError
-from mlserver.handlers import custom_handler
-from mlserver.logging import logger
-from mlserver.model import MLModel
-from mlserver.settings import ModelParameters
+
 from mlserver.types import InferenceRequest, InferenceResponse
+from mlserver.model import MLModel
 from mlserver.utils import get_model_uri
+from mlserver.handlers import custom_handler
+from mlserver.errors import InferenceError
+from mlserver.settings import ModelParameters
+from mlserver.logging import logger
 
 from .codecs import TensorDictCodec
 from .metadata import (
-    DefaultInputPrefix,
-    DefaultOutputPrefix,
     to_metadata_tensors,
     to_model_content_type,
+    DefaultInputPrefix,
+    DefaultOutputPrefix,
 )
 
 
