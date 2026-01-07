@@ -1,34 +1,33 @@
-import mlflow
-
+import asyncio
 from io import StringIO
-from fastapi import Depends, Header, Request, Response
 
-from mlflow.version import VERSION
+import mlflow
+from fastapi import Depends, Header, Request, Response
 from mlflow.exceptions import MlflowException
 from mlflow.pyfunc.scoring_server import (
-    CONTENT_TYPES,
     CONTENT_TYPE_CSV,
     CONTENT_TYPE_JSON,
-    parse_csv_input,
+    CONTENT_TYPES,
     _split_data_and_params,
     infer_and_parse_data,
+    parse_csv_input,
     predictions_to_json,
 )
-
-from mlserver.types import InferenceRequest, InferenceResponse
-from mlserver.model import MLModel
-from mlserver.utils import get_model_uri
-from mlserver.handlers import custom_handler
+from mlflow.version import VERSION
 from mlserver.errors import InferenceError
-from mlserver.settings import ModelParameters
+from mlserver.handlers import custom_handler
 from mlserver.logging import logger
+from mlserver.model import MLModel
+from mlserver.settings import ModelParameters
+from mlserver.types import InferenceRequest, InferenceResponse
+from mlserver.utils import get_model_uri
 
 from .codecs import TensorDictCodec
 from .metadata import (
-    to_metadata_tensors,
-    to_model_content_type,
     DefaultInputPrefix,
     DefaultOutputPrefix,
+    to_metadata_tensors,
+    to_model_content_type,
 )
 
 
@@ -155,6 +154,10 @@ class MLflowRuntime(MLModel):
     async def load(self) -> bool:
         # TODO: Log info message
         model_uri = await get_model_uri(self._settings)
+
+        # INFO: Install dependencies before loading the model
+        await self._install_dependencies(model_uri)
+
         self._model = mlflow.pyfunc.load_model(model_uri)
 
         self._input_schema = self._model.metadata.get_input_schema()
@@ -162,6 +165,25 @@ class MLflowRuntime(MLModel):
         self._sync_metadata()
 
         return True
+
+    async def _install_dependencies(self, model_uri: str):
+        model_dependencies = mlflow.pyfunc.mlflow.artifacts.download_artifacts(
+            f"{model_uri}/requirements.txt"
+        )
+
+        logger.info(f"Dependencies file: {model_dependencies}")
+        await self._run_uv_add(model_dependencies)
+        cmd = ["uv", "pip", "install", "-r", model_dependencies]
+        logger.debug(f"Running command: {' '.join(cmd)}")
+
+        # Execute command asynchronously
+        process = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            error_msg = stderr.decode() if stderr else "Unknown error"
+            raise RuntimeError(f"Failed to install dependencies: {error_msg}")
 
     def _sync_metadata(self) -> None:
         # Update metadata from model signature (if present)
