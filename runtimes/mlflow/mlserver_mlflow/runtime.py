@@ -174,8 +174,7 @@ class MLflowRuntime(MLModel):
         )
 
         logger.info(f"Dependencies file: {model_dependencies}")
-        await self._run_uv_add(model_dependencies)
-        cmd = ["uv", "pip", "install", "-r", model_dependencies]
+        cmd = ["pip", "install", "-r", model_dependencies]
         logger.debug(f"Running command: {' '.join(cmd)}")
 
         # Execute command asynchronously
