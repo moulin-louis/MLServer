@@ -158,7 +158,8 @@ class MLflowRuntime(MLModel):
         model_uri = await get_model_uri(self._settings)
 
         # INFO: Install dependencies before loading the model
-        await self._install_dependencies(model_uri)
+        if getattr(self._settings.parameters.extra, "auto_install_dependencies", False):
+            await self._install_dependencies(model_uri)
 
         self._model = mlflow.pyfunc.load_model(model_uri)
 
@@ -173,9 +174,7 @@ class MLflowRuntime(MLModel):
             f"{model_uri}/requirements.txt"
         )
 
-        logger.info(f"Dependencies file: {model_dependencies}")
         cmd = ["pip", "install", "-r", model_dependencies]
-        logger.debug(f"Running command: {' '.join(cmd)}")
 
         # Execute command asynchronously
         process = await asyncio.create_subprocess_exec(
