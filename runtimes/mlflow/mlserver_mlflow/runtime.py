@@ -157,8 +157,8 @@ class MLflowRuntime(MLModel):
         # TODO: Log info message
         model_uri = await get_model_uri(self._settings)
 
-        # INFO: Install dependencies before loading the model
         if getattr(self._settings.parameters.extra, "auto_install_dependencies", False):
+            # INFO: Install dependencies before loading the model
             await self._install_dependencies(model_uri)
 
         self._model = mlflow.pyfunc.load_model(model_uri)
